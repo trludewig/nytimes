@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">New York Times Search Tool</string>
+    <string name="search_hint">Enter search text</string>
+    <string name="search_title">Search</string>
+    <string name="title_activity_main">Search</string>
+    <string name="error">Error</string>
+    <string name="error_message">Oops!  An error occurred trying to retrieve the articles.  Please try again.</string>
+    <string name="no_results_message">There were no results found\nfor that search criteria!</string>
+</resources>
