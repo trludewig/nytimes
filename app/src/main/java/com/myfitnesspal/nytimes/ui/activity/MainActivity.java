@@ -54,7 +54,6 @@ import static com.jayway.jsonpath.JsonPath.read;
  * TODO - Exception Handling
  * TODO - Logging framework
  * TODO - Write tests.
- * TODO - Prevent
  */
 public class MainActivity extends AppCompatActivity implements ArticleSearchAdapter.OnItemClickListener {
 
@@ -352,7 +351,7 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
             a.setHeadline((String) read(d, "$.response.docs[" + i + "].headline.main"));
             a.setWebUrl((String) read(d, "$.response.docs[" + i + "].web_url"));
             try {
-                List<Map<String, Object>> t = read(d, "$.response.docs[" + i + "].multimedia[?(@.width == 75)].url");
+                List<Map<String, Object>> t = read(d, "$.response.docs[" + i + "].multimedia[?(@.width == 190)].url");
                 if (t != null && t.size() > 0) {
                     a.setThumbnail("http://www.nytimes.com/" + t.get(0));
                 }
