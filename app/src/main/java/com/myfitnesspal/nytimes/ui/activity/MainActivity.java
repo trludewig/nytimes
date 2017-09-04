@@ -12,10 +12,13 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.jayway.jsonpath.Configuration;
 import com.myfitnesspal.nytimes.R;
@@ -50,7 +53,6 @@ import static com.jayway.jsonpath.JsonPath.read;
  * TODO - Sanitize query strings entered by user before attempting service call.
  * TODO - Review generics and update use of them here.
  * TODO - Implement using Fragments.
- * TODO - Clean up alignment of item views in RecyclerView and add divider.
  * TODO - Exception Handling
  * TODO - Logging framework
  * TODO - Write tests.
@@ -61,12 +63,18 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     private ArticleSearchAdapter articlesAdapter;
     private RecyclerView recyclerView;
     private LinearLayout emptyLayout, errorLayout;
+    private SearchView searchView;
+    private ProgressBar spinner;
+
+    private SearchView.OnQueryTextListener queryTextListener;
+
     private boolean isLastPage = false;
     private int currentPage = 0;
     private String currentView;
     private String queryStr;
     private boolean isLoading = false;
     private ArticlesService articlesService;
+
     private static final int PAGE_SIZE = 10;
     private ArrayList<Article> articles = new ArrayList<>();
     private List<Call> calls = new ArrayList<>();
@@ -89,11 +97,8 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
             setUpViews();
             layoutManager = new LinearLayoutManager(this);
             recyclerView.setLayoutManager(layoutManager);
-
             articlesAdapter = new ArticleSearchAdapter(this);
             recyclerView.setAdapter(articlesAdapter);
-
-            addListeners();
         }
 
         articlesService = ServiceGenerator.createService(
@@ -107,7 +112,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
                 handleIntent(intent);
             }
             else {
-                System.out.println("calling refreshAdapter from onCreate");
                 refreshAdapter();
             }
         }
@@ -116,7 +120,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     @Override
     public void onDestroy() {
         super.onDestroy();
-        removeListeners();
         for(final Call call : calls) {
 
             try {
@@ -129,13 +132,15 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
 
     @Override
     protected void onPause() {
+        removeListeners();
         super.onPause();
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        //addListeners();
+        addListeners();
     }
 
     @Override
@@ -149,13 +154,11 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         outState.putString(CURRENT_VIEW, currentView);
     }
 
-    // I'm pretty unclear at this time on how to retrieve views from savedstate, what I get for free vs.
-    // what I have to manually save and restore, etc.
-    // I think this is pretty ugly.
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
 
+        System.out.println("hit onRestoreInstanceState");
         articles = savedInstanceState.getParcelableArrayList(ARTICLES);
         queryStr = savedInstanceState.getString(QUERY_STR);
         currentPage = savedInstanceState.getInt(CURRENT_PAGE);
@@ -172,7 +175,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         articlesAdapter = new ArticleSearchAdapter(this, articles);
         recyclerView.setAdapter(articlesAdapter);
 
-        addListeners();
     }
 
     protected void setUpViews() {
@@ -181,30 +183,37 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         emptyLayout = (LinearLayout) findViewById(R.id.empty_view);
         errorLayout = (LinearLayout) findViewById(R.id.error_view);
         recyclerView = (RecyclerView) findViewById(R.id.article_search_view);
-        recyclerView.setHasFixedSize(true);
+        spinner = (ProgressBar)findViewById(R.id.progressBar);
+
     }
 
-    // Need to switch to fragments!
     protected void showView(String whichView, String copyText) {
+
         switch(whichView) {
             case RECYCLER_VIEW:
                 if (currentView != RECYCLER_VIEW) {
                     emptyLayout.setVisibility(GONE);
                     errorLayout.setVisibility(GONE);
+                    //spinner.setVisibility(GONE);
                     recyclerView.setVisibility(VISIBLE);
                     currentView = RECYCLER_VIEW;
+                }
+                else {
+                    System.out.println("already set to recyclerview");
                 }
                 break;
             case EMPTY_VIEW:
                 emptyLayout.setVisibility(VISIBLE);
                 errorLayout.setVisibility(GONE);
                 recyclerView.setVisibility(GONE);
+                spinner.setVisibility(GONE);
                 currentView = EMPTY_VIEW;
                 break;
             case ERROR_VIEW:
                 emptyLayout.setVisibility(GONE);
                 errorLayout.setVisibility(VISIBLE);
                 recyclerView.setVisibility(GONE);
+                spinner.setVisibility(GONE);
                 TextView errorText = (TextView) errorLayout.findViewById(R.id.error_message);
                 errorText.setText(copyText != null ? copyText : Constants.GENERAL_ERROR);
                 currentView = ERROR_VIEW;
@@ -212,10 +221,12 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
             default:
                 emptyLayout.setVisibility(GONE);
                 errorLayout.setVisibility(GONE);
+                spinner.setVisibility(GONE);
                 recyclerView.setVisibility(VISIBLE);
                 currentView = RECYCLER_VIEW;
                 break;
         }
+
     }
 
     protected void showView(String whichView) {
@@ -230,6 +241,7 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     protected void removeListeners() {
         articlesAdapter.removeOnItemClickListener();
         recyclerView.removeOnScrollListener(recyclerViewOnScrollListener);
+        searchView.setOnQueryTextListener(null);
     }
 
     @Override
@@ -238,11 +250,16 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         inflater.inflate(R.menu.search_menu, menu);
 
         SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
-        SearchView searchView = (SearchView) MenuItemCompat.getActionView(menu.findItem(R.id.action_search));
+        searchView = (SearchView) MenuItemCompat.getActionView(menu.findItem(R.id.action_search));
 
         searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName()));
         searchView.setIconifiedByDefault(false);
         searchView.setSubmitButtonEnabled(true);
+
+        if (queryStr != null && !TextUtils.isEmpty(queryStr)) {
+            searchView.setQuery(queryStr, false);
+        }
+
         return true;
     }
 
@@ -254,7 +271,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
             queryStr = intent.getStringExtra(QUERY);
         }
-        System.out.println("calling refreshAdapter from handleIntent");
         refreshAdapter();
     }
 
@@ -268,28 +284,35 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         @Override
         public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
             isLoading = false;
+            spinner.setVisibility(GONE);
+
             ArrayList<Article> articles = null;
 
             if (!response.isSuccessful()) {
                 // TODO - Log responseCode.
+                System.out.println("failed service call: " + response.errorBody() + " and code: " + response.code());
                 showView(ERROR_VIEW);
                 return;
             }
 
             try {
                 articles = parseArticlesFromResponse(response.body().string());
+
                 if (articles != null && articles.size() > 0) {
+                    System.out.println("articles received and updating adapter");
                     articlesAdapter.addAll(articles);
+                    System.out.println("now have this many articles in adapter: " + articles.size());
                     if (articles.size() < PAGE_SIZE) {
                         isLastPage = true;
                         System.out.println("setting isLastPage to true: articles.size()" + articles.size() + " and PAGE_SIZE = 10");
-
                     }
                 }
                 if (articlesAdapter.isEmpty()) {
+                    System.out.println("articles empty and updating to show empty");
                     showView(EMPTY_VIEW);
                 }
                 else {
+                    System.out.println("showing list view");
                     showView(RECYCLER_VIEW);
                 }
             } catch (IOException e) {
@@ -303,8 +326,10 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         @Override
         public void onFailure(Call<ResponseBody> call, Throwable t) {
             // Log exception.
+            t.printStackTrace();
             if (!call.isCanceled()) {
                 isLoading = false;
+
                 if (t instanceof NetworkException) {
                     showView(ERROR_VIEW, Constants.NETWORK_ERROR);
                 }
@@ -319,7 +344,9 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         articlesAdapter.clear();
         currentPage = 0;
 
-        System.out.println("refreshAdapter - Enqueuing queryStr: " + queryStr + " and currentPage: " + currentPage);
+        isLoading = true;
+        spinner.setVisibility(VISIBLE);
+
         Call getArticlesCall = articlesService.getArticles(queryStr, currentPage);
         calls.add(getArticlesCall);
         getArticlesCall.enqueue(getArticlesCallback);
@@ -327,9 +354,9 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
 
     protected void loadMoreItems() {
         isLoading = true;
-        currentPage += 1;
+        spinner.setVisibility(VISIBLE);
 
-        System.out.println("loadMoreItems 0 Enqueuing queryStr: " + queryStr + " and currentPage: " + currentPage);
+        currentPage += 1;
 
         Call getArticlesCall = articlesService.getArticles(queryStr, currentPage);
         calls.add(getArticlesCall);
@@ -367,7 +394,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     protected RecyclerView.OnScrollListener recyclerViewOnScrollListener = new RecyclerView.OnScrollListener() {
         @Override
         public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-            System.out.println("FIRST");
             super.onScrollStateChanged(recyclerView, newState);
         }
 
@@ -377,14 +403,8 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
             int visibleItemCount = layoutManager.getChildCount();
             int totalItemCount = layoutManager.getItemCount();
             int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
-            System.out.println("SECOND");
-
             if (!isLoading && !isLastPage) {
-                System.out.println("visibleItemCount: " + visibleItemCount
-                        + "\nfirstVisibleItemPosition: " + firstVisibleItemPosition
-                        + "\ntotalItemCount: " + totalItemCount);
                 if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount) {
-                    System.out.println("Calling loadMoreItems");
                     loadMoreItems();
                 }
             }

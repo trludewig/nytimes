@@ -68,7 +68,6 @@ public class ArticleSearchAdapter extends RecyclerView.Adapter<RecyclerView.View
 
     @Override
     public int getItemCount() {
-
         return articles.size();
     }
 
@@ -76,7 +75,6 @@ public class ArticleSearchAdapter extends RecyclerView.Adapter<RecyclerView.View
     public RecyclerView.ViewHolder onCreateViewHolder(final ViewGroup viewGroup, int viewType) {
         View articleView = LayoutInflater.from(viewGroup.getContext()).inflate(
                 R.layout.article_search_item, viewGroup, false);
-
         return new ArticleViewHolder(articleView);
     }
 
@@ -111,7 +109,6 @@ public class ArticleSearchAdapter extends RecyclerView.Adapter<RecyclerView.View
 
     public void add(Article item) {
         articles.add(item);
-        System.out.println("Adding: " + item.getHeadline());
         notifyItemInserted(articles.size() - 1);
     }
 

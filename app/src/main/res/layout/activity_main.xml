@@ -17,8 +17,16 @@
     <android.support.v7.widget.RecyclerView
         android:id="@+id/article_search_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:scrollbars="vertical" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:visibility="visible"/>
 
     <include layout="@layout/empty_layout"/>
     <include layout="@layout/error_layout"/>
