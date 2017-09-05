@@ -12,13 +12,11 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
-import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.jayway.jsonpath.Configuration;
 import com.myfitnesspal.nytimes.R;
@@ -46,6 +44,7 @@ import static android.view.View.VISIBLE;
 import static com.jayway.jsonpath.JsonPath.read;
 
 /**
+ * TODO - Move progress spinner to recyclerView layout as a row.
  * TODO - Make layouts that are specific to device size and landscape/portrait.
  * TODO - Get images into the correct drawable folders such that appropriately sized images are shown.
  * TODO - Fix search such that you can search on blank!
@@ -56,6 +55,7 @@ import static com.jayway.jsonpath.JsonPath.read;
  * TODO - Exception Handling
  * TODO - Logging framework
  * TODO - Write tests.
+ * TODO - Improve documentation for javadocs.
  */
 public class MainActivity extends AppCompatActivity implements ArticleSearchAdapter.OnItemClickListener {
 
@@ -65,8 +65,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     private LinearLayout emptyLayout, errorLayout;
     private SearchView searchView;
     private ProgressBar spinner;
-
-    private SearchView.OnQueryTextListener queryTextListener;
 
     private boolean isLastPage = false;
     private int currentPage = 0;
@@ -158,7 +156,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
 
-        System.out.println("hit onRestoreInstanceState");
         articles = savedInstanceState.getParcelableArrayList(ARTICLES);
         queryStr = savedInstanceState.getString(QUERY_STR);
         currentPage = savedInstanceState.getInt(CURRENT_PAGE);
@@ -194,12 +191,8 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
                 if (currentView != RECYCLER_VIEW) {
                     emptyLayout.setVisibility(GONE);
                     errorLayout.setVisibility(GONE);
-                    //spinner.setVisibility(GONE);
                     recyclerView.setVisibility(VISIBLE);
                     currentView = RECYCLER_VIEW;
-                }
-                else {
-                    System.out.println("already set to recyclerview");
                 }
                 break;
             case EMPTY_VIEW:
@@ -241,7 +234,6 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     protected void removeListeners() {
         articlesAdapter.removeOnItemClickListener();
         recyclerView.removeOnScrollListener(recyclerViewOnScrollListener);
-        searchView.setOnQueryTextListener(null);
     }
 
     @Override
@@ -256,15 +248,10 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
         searchView.setIconifiedByDefault(false);
         searchView.setSubmitButtonEnabled(true);
 
-        if (queryStr != null && !TextUtils.isEmpty(queryStr)) {
-            searchView.setQuery(queryStr, false);
-        }
-
         return true;
     }
 
     /**
-     * TODO - Prevent this from being called twice due to hardware button search.
      * @param intent
      */
     protected void handleIntent(Intent intent) {
@@ -299,20 +286,15 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
                 articles = parseArticlesFromResponse(response.body().string());
 
                 if (articles != null && articles.size() > 0) {
-                    System.out.println("articles received and updating adapter");
                     articlesAdapter.addAll(articles);
-                    System.out.println("now have this many articles in adapter: " + articles.size());
                     if (articles.size() < PAGE_SIZE) {
                         isLastPage = true;
-                        System.out.println("setting isLastPage to true: articles.size()" + articles.size() + " and PAGE_SIZE = 10");
                     }
                 }
                 if (articlesAdapter.isEmpty()) {
-                    System.out.println("articles empty and updating to show empty");
                     showView(EMPTY_VIEW);
                 }
                 else {
-                    System.out.println("showing list view");
                     showView(RECYCLER_VIEW);
                 }
             } catch (IOException e) {
@@ -325,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
 
         @Override
         public void onFailure(Call<ResponseBody> call, Throwable t) {
-            // Log exception.
+            // TODO - Log exception.
             t.printStackTrace();
             if (!call.isCanceled()) {
                 isLoading = false;
@@ -364,7 +346,7 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
     }
 
     /**
-     * Clean this up, it's awful!
+     * Clean this up, it's awful!  I didn't want to create all the superfluous POJO classes in the json.  I realize there are ways to ignore but...
      * @param s
      * @return
      */
@@ -383,11 +365,10 @@ public class MainActivity extends AppCompatActivity implements ArticleSearchAdap
                     a.setThumbnail("http://www.nytimes.com/" + t.get(0));
                 }
             } catch (Exception e) {
-                System.out.println("Handle this exception!");
+                // TODO - handle exception
             }
             articles.add(a);
         }
-        System.out.println(articles);
         return articles;
     }
 
